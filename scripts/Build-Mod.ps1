@@ -7,6 +7,7 @@
     .\scripts\Build-Mod.ps1
     .\scripts\Build-Mod.ps1 -Configuration Release
     .\scripts\Build-Mod.ps1 -DvInstallDir "D:\Steam\steamapps\common\Derail Valley"
+    .\scripts\Build-Mod.ps1 -FetchBuildAssets
 #>
 [CmdletBinding()]
 param(
@@ -14,7 +15,9 @@ param(
     [string]$Configuration = 'Debug',
     [string]$DvInstallDir = '',
     [string]$UnityInstallDir = '',
-    [switch]$SkipUnityAssetsCheck
+    [switch]$SkipUnityAssetsCheck,
+    [switch]$FetchBuildAssets,
+    [switch]$NoAutoFetchBuildAssets
 )
 
 $ErrorActionPreference = 'Stop'
@@ -74,14 +77,56 @@ function Ensure-DirectoryBuildTargets {
     Write-Host "Created Directory.Build.targets"
 }
 
+function Get-RequiredBuildAssetNames {
+    return @('multiplayer.assetbundle', 'MultiplayerEditor.dll', 'UnityChan.dll')
+}
+
+function Get-ReleaseDownloadUrl {
+    $releasesJson = Join-Path $repoRoot 'releases.json'
+    if (Test-Path -LiteralPath $releasesJson) {
+        $data = Get-Content -LiteralPath $releasesJson -Raw | ConvertFrom-Json
+        $entry = @($data.Releases | Where-Object { $_.Id -eq 'Multiplayer' } | Select-Object -First 1)[0]
+        if ($entry -and $entry.DownloadUrl) {
+            return $entry.DownloadUrl
+        }
+    }
+    return 'https://github.com/AMacro/dv-multiplayer/releases/download/v0.1.14.0-Beta/Multiplayer.0.1.14.0.zip'
+}
+
+function Install-BuildAssetsFromRelease {
+    $url = Get-ReleaseDownloadUrl
+    $zipPath = Join-Path $env:TEMP 'dv-multiplayer-release.zip'
+    $extractPath = Join-Path $env:TEMP 'dv-multiplayer-release-extract'
+
+    Write-Host "Downloading release assets..." -ForegroundColor Cyan
+    Write-Host "  $url"
+    Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing
+
+    if (Test-Path -LiteralPath $extractPath) {
+        Remove-Item -LiteralPath $extractPath -Recurse -Force
+    }
+    Expand-Archive -LiteralPath $zipPath -DestinationPath $extractPath -Force
+
+    if (-not (Test-Path -LiteralPath $buildDir)) {
+        New-Item -ItemType Directory -Path $buildDir | Out-Null
+    }
+
+    foreach ($name in (Get-RequiredBuildAssetNames)) {
+        $found = Get-ChildItem -Path $extractPath -Filter $name -Recurse -File -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if (-not $found) {
+            throw "Release zip does not contain $name"
+        }
+        Copy-Item -LiteralPath $found.FullName -Destination (Join-Path $buildDir $name) -Force
+        Write-Host "  build\$name" -ForegroundColor Green
+    }
+
+    Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
+}
+
 function Test-BuildAssets {
-    $required = @(
-        'multiplayer.assetbundle',
-        'MultiplayerEditor.dll',
-        'UnityChan.dll'
-    )
     $missing = @()
-    foreach ($name in $required) {
+    foreach ($name in (Get-RequiredBuildAssetNames)) {
         if (-not (Test-Path -LiteralPath (Join-Path $buildDir $name))) {
             $missing += $name
         }
@@ -89,8 +134,19 @@ function Test-BuildAssets {
     if ($missing.Count -eq 0) { return $true }
 
     Write-Warning "build/ is missing: $($missing -join ', ')"
-    Write-Warning "Build Unity assets (Multiplayer > Build Asset Bundle and Scripts) or copy from a release zip into build/"
     return $false
+}
+
+function Ensure-BuildAssets {
+    if (Test-BuildAssets) { return }
+
+    if ($FetchBuildAssets -or (-not $NoAutoFetchBuildAssets -and -not $SkipUnityAssetsCheck)) {
+        Install-BuildAssetsFromRelease
+        if (Test-BuildAssets) { return }
+    }
+
+    Write-Warning "Build Unity assets (Multiplayer > Build Asset Bundle and Scripts) or run: .\scripts\Build-Mod.ps1 -FetchBuildAssets"
+    throw "Cannot compile Multiplayer without build/ assets. Use -SkipUnityAssetsCheck only if you know what you are doing."
 }
 
 # --- main ---
@@ -119,9 +175,10 @@ if (-not (Test-Path -LiteralPath $buildDir)) {
 Ensure-DirectoryBuildTargets -DvDir $dvDir -UnityDir $unityDir
 
 if (-not $SkipUnityAssetsCheck) {
-    if (-not (Test-BuildAssets)) {
-        throw "Cannot compile Multiplayer without build/ assets. Use -SkipUnityAssetsCheck to try anyway."
-    }
+    Ensure-BuildAssets
+}
+elseif ($FetchBuildAssets) {
+    Install-BuildAssetsFromRelease
 }
 
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
