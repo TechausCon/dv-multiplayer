@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "comment": "Copy to phase0.config.json and adjust paths for your Windows machine.",
+
+  "DvInstallDir": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Derail Valley",
+  "SteamExe": "C:\\Program Files (x86)\\Steam\\steam.exe",
+  "SteamCmd": "C:\\steamcmd\\steamcmd.exe",
+
+  "ModFolderName": "Multiplayer",
+  "ExpectedModVersion": "0.1.14.0",
+  "ExpectedUmmVersion": "0.27.3",
+
+  "GamePort": 7777,
+  "LobbyServerUrl": "https://dv.mineit.space",
+
+  "RemoteServerHost": null,
+  "RemoteServerPort": 7777,
+
+  "LaunchSmokeTest": false,
+  "LaunchArgs": ["-batchmode", "-nographics"],
+  "SmokeTestTimeoutSeconds": 180,
+  "SmokeTestKillOnComplete": true,
+
+  "SessionMonitor": {
+    "Enabled": false,
+    "DurationSeconds": 600,
+    "SampleIntervalSeconds": 10,
+    "RequireUdpPortListening": true
+  },
+
+  "LogFileName": "multiplayer.log",
+  "LogSuccessPatterns": [
+    "Patching\\.\\.\\.",
+    "Creating NetworkManager",
+    "Loading API Provider",
+    "LiteNetLib Version"
+  ],
+  "LogFailurePatterns": [
+    "Failed to load:",
+    "AssetBundle not found",
+    "Multiplayer API version mismatch",
+    "Exception while"
+  ],
+  "LogServerPatterns": [
+    "Starting server on port",
+    "\\[Server\\].*Server loaded"
+  ]
+}
