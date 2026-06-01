@@ -296,6 +296,16 @@ Neueste Einträge oben. Jede Session/ Aufgabe kurz festhalten: **Datum**, **Ziel
 
 ---
 
+### 2026-06-01 — LiteNetLib / IP-Transport (Use Steam Networking)
+
+| | |
+|---|---|
+| **Anfrage** | Normaler Mod ohne Steamworks, nur IP |
+| **Ergebnis** | Setting `UseSteamNetworking`; bei `false` LiteNetLib + Host/Join per Manual Connect |
+| **Commit** | `678042e` auf `origin/beta` |
+
+---
+
 ### 2026-06-01 — Phase-0-Testautomatisierung (PowerShell)
 
 | | |
