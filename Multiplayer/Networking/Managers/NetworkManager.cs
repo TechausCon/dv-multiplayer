@@ -33,8 +33,10 @@ public abstract class NetworkManager
     protected NetworkManager(Settings settings)
     {
         netPacketProcessor = new NetPacketProcessor();
-        //transport = new LiteNetLibTransport();
-        transport = new SteamWorksTransport();
+        transport = settings.UseSteamNetworking
+            ? new SteamWorksTransport()
+            : new LiteNetLibTransport();
+        Multiplayer.Log($"Network transport: {(settings.UseSteamNetworking ? "Steam Networking Sockets" : "LiteNetLib (direct IP/UDP)")}");
 
         transport.OnConnectionRequest += OnConnectionRequest;
         transport.OnPeerConnected += OnPeerConnected;

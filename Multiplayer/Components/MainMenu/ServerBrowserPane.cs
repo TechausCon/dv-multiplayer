@@ -909,6 +909,15 @@ public class ServerBrowserPane : MonoBehaviour
 
         if (!direct && joinedLobby != null)
         {
+            if (!Multiplayer.Settings.UseSteamNetworking)
+            {
+                AttemptFail();
+                MainMenuThingsAndStuff.Instance.ShowOkPopup(
+                    "Steam lobby join is disabled. Enable \"Use Steam Networking\" in mod settings, or use Manual Connect (IP:port).",
+                    () => { });
+                return;
+            }
+
             connectionState = ConnectionState.AttemptingSteamRelay;
             string hostId = ((Lobby)joinedLobby).Owner.Id.Value.ToString();
             NetworkLifecycle.Instance.StartClient(hostId, -1, password, false, OnDisconnect);

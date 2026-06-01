@@ -87,7 +87,7 @@ public class LobbyServerManager : MonoBehaviour
             yield break;
 
         //Create a steam lobby
-        if (DVSteamworks.Success)
+        if (Multiplayer.Settings.UseSteamNetworking && DVSteamworks.Success)
         {
             CreateSteamLobby();
         }
