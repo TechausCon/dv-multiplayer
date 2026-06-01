@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "comment": "Copy to phase0.config.json and adjust paths for your Windows machine.",
 
-  "DvInstallDir": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Derail Valley",
+  "DvInstallDir": "C:\\Spiele\\DerailValley\\Derail Valley",
   "SteamExe": "C:\\Program Files (x86)\\Steam\\steam.exe",
   "SteamCmd": "C:\\steamcmd\\steamcmd.exe",
 
