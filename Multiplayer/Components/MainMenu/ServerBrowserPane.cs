@@ -14,6 +14,8 @@ using Multiplayer.Components.Util;
 using Multiplayer.Networking.Data;
 using Multiplayer.Patches.MainMenu;
 using Multiplayer.Utils;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Steamworks;
 using Steamworks.Data;
 using System;
@@ -25,6 +27,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.UI;
 using Color = UnityEngine.Color;
 
@@ -134,7 +137,8 @@ public class ServerBrowserPane : MonoBehaviour
 
     public void Update()
     {
-        SteamClient.RunCallbacks();
+        if (DVSteamworks.Success)
+            SteamClient.RunCallbacks();
 
         //Handle server refresh interval
         timePassed += Time.deltaTime;
@@ -168,9 +172,9 @@ public class ServerBrowserPane : MonoBehaviour
             pingTimer = 0f;
         }
 
-        if (lobbyToJoin != null && connectionState == ConnectionState.NotConnected)
+        if (DVSteamworks.Success && lobbyToJoin != null && connectionState == ConnectionState.NotConnected)
         {
-            //For invites/requests
+            // Steam lobby invites (optional; multiplayer uses IP)
             Multiplayer.Log($"Player invite initiated/request");
 
             if (lobbyToJoin.Value.Id.IsValid)
@@ -184,15 +188,6 @@ public class ServerBrowserPane : MonoBehaviour
                 lobbyToJoin = null;
             }
         }
-    }
-
-    public void Start()
-    {
-        if (DVSteamworks.Success)
-            return;
-
-        Multiplayer.Log($"Steam not detected, prompt for restart.");
-        MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Please restart the game with Steam running", () => { });
     }
 
     private void CleanUI()
@@ -463,9 +458,7 @@ public class ServerBrowserPane : MonoBehaviour
         //buttonJoin.ToggleInteractable(false);
         buttonRefresh.ToggleInteractable(false);
 
-        if (DVSteamworks.Success)
-            ListActiveLobbies();
-
+        StartCoroutine(ListHttpGameServers());
     }
     private void JoinAction()
     {
@@ -475,21 +468,19 @@ public class ServerBrowserPane : MonoBehaviour
         buttonDirectIP.ToggleInteractable(false);
         buttonJoin.ToggleInteractable(false);
 
-        //not making a direct connection
         direct = false;
-        portNumber = -1;
 
-        var lobby = GetLobbyFromServer(selectedServer);
-        if (lobby != null)
+        if (selectedServer is LobbyServerData lobbyData && !string.IsNullOrEmpty(lobbyData.ipv4))
         {
-            selectedLobby = (Lobby)lobby;
-            _ = JoinLobby((Lobby)selectedLobby);
+            address = lobbyData.ipv4;
+            portNumber = lobbyData.port > 0 ? lobbyData.port : Multiplayer.Settings.Port;
+            ShowPasswordPopup();
+            return;
         }
-        else
-        {
-            Multiplayer.LogWarning($"JoinAction called but lobby is null");
-            AttemptFail();
-        }
+
+        Multiplayer.LogWarning("JoinAction: server has no IPv4 address. Use Manual Connect.");
+        AttemptFail();
+        MainMenuThingsAndStuff.Instance.ShowOkPopup(Locale.SERVER_BROWSER__IP_INVALID, () => { });
     }
 
     private void DirectAction()
@@ -896,7 +887,7 @@ public class ServerBrowserPane : MonoBehaviour
     #region workflow
     private void UpdatePings()
     {
-        UpdatePingsSteam();
+        // IP-only: no Steam ping estimation
     }
 
     private void InitiateConnection()
@@ -906,23 +897,6 @@ public class ServerBrowserPane : MonoBehaviour
 
         attempt = 0;
         ShowConnectingPopup();
-
-        if (!direct && joinedLobby != null)
-        {
-            if (!Multiplayer.Settings.UseSteamNetworking)
-            {
-                AttemptFail();
-                MainMenuThingsAndStuff.Instance.ShowOkPopup(
-                    "Steam lobby join is disabled. Enable \"Use Steam Networking\" in mod settings, or use Manual Connect (IP:port).",
-                    () => { });
-                return;
-            }
-
-            connectionState = ConnectionState.AttemptingSteamRelay;
-            string hostId = ((Lobby)joinedLobby).Owner.Id.Value.ToString();
-            NetworkLifecycle.Instance.StartClient(hostId, -1, password, false, OnDisconnect);
-            return;
-        }
 
         Multiplayer.Log($"AttemptConnection address: {address}");
 
@@ -1106,7 +1080,69 @@ public class ServerBrowserPane : MonoBehaviour
     #endregion
 
 
-    #region steam lobby
+    #region lobby browser (HTTP)
+    private IEnumerator ListHttpGameServers()
+    {
+        remoteServers.Clear();
+        string baseUrl = Multiplayer.Settings.LobbyServerAddress?.TrimEnd('/') ?? "";
+        if (string.IsNullOrEmpty(baseUrl))
+        {
+            Multiplayer.LogWarning("LobbyServerAddress is empty");
+            remoteRefreshComplete = true;
+            yield break;
+        }
+
+        string url = $"{baseUrl}/list_game_servers";
+        using UnityWebRequest request = UnityWebRequest.Get(url);
+        request.downloadHandler = new DownloadHandlerBuffer();
+        yield return request.SendWebRequest();
+
+        if (request.isNetworkError || request.isHttpError)
+        {
+            Multiplayer.LogError($"ListHttpGameServers failed: {request.error} (HTTP {request.responseCode})");
+            remoteRefreshComplete = true;
+            yield break;
+        }
+
+        try
+        {
+            JArray entries = JArray.Parse(request.downloadHandler.text);
+            foreach (JToken entry in entries)
+            {
+                LobbyServerData server = entry.ToObject<LobbyServerData>();
+                if (server == null || string.IsNullOrEmpty(server.ipv4))
+                    continue;
+
+                string modsJson = entry["required_mods"]?.ToString();
+                if (!string.IsNullOrWhiteSpace(modsJson))
+                {
+                    try
+                    {
+                        server.RequiredMods = JsonConvert.DeserializeObject<ModInfo[]>(modsJson);
+                    }
+                    catch (Exception ex)
+                    {
+                        Multiplayer.LogWarning($"Failed to parse required_mods for {server.Name}: {ex.Message}");
+                    }
+                }
+
+                if (string.IsNullOrEmpty(server.id))
+                    server.id = $"{server.ipv4}:{server.port}";
+
+                remoteServers.Add(server);
+            }
+
+            Multiplayer.Log($"ListHttpGameServers: {remoteServers.Count} server(s)");
+        }
+        catch (Exception ex)
+        {
+            Multiplayer.LogError($"ListHttpGameServers parse error: {ex.Message}");
+        }
+
+        remoteRefreshComplete = true;
+    }
+
+    #region steam lobby (legacy, unused for IP-only multiplayer)
     private async void ListActiveLobbies()
     {
         lobbies = await SteamMatchmaking.LobbyList.WithMaxResults(100)

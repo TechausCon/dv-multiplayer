@@ -86,13 +86,7 @@ public class LobbyServerManager : MonoBehaviour
         if (server == null || server.ServerData == null)
             yield break;
 
-        //Create a steam lobby
-        if (Multiplayer.Settings.UseSteamNetworking && DVSteamworks.Success)
-        {
-            CreateSteamLobby();
-        }
-
-        //Register with old php lobby server (provides stats and makes the lobby visible, but not joinable to users on old versions)
+        //Register with HTTP lobby server (public server list; join via IP)
         server.ServerData.ipv6 = GetStaticIPv6Address();
         server.ServerData.LocalIPv4 = GetLocalIPv4Address();
 

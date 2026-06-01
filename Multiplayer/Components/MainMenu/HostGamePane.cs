@@ -67,12 +67,6 @@ public class HostGamePane : MonoBehaviour
     public void Start()
     {
         Multiplayer.Log("HostGamePane Started");
-
-        if (!Multiplayer.Settings.UseSteamNetworking || DVSteamworks.Success)
-            return;
-
-        Multiplayer.Log($"Steam not detected, prompt for restart.");
-        MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam networking is enabled but Steam was not detected. Disable \"Use Steam Networking\" in mod settings to host over IP only, or restart the game with Steam running.", () => { });
     }
 
     public void OnEnable()
@@ -392,9 +386,6 @@ public class HostGamePane : MonoBehaviour
         bool valid = true;
 
         if (incompatibleMods)
-            valid = false;
-
-        if (Multiplayer.Settings.UseSteamNetworking && !DVSteamworks.Success)
             valid = false;
 
         if (serverName.text.Trim() == "" || serverName.text.Length > MAX_SERVER_NAME_LEN)

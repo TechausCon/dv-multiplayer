@@ -14,7 +14,7 @@ namespace Multiplayer;
 [DrawFields(DrawFieldMask.OnlyDrawAttr)]
 public class Settings : UnityModManager.ModSettings, IDrawable
 {
-    public const int CURRENT_VERSION = 4;
+    public const int CURRENT_VERSION = 5;
     public const byte MAX_USERNAME_LENGTH = 24;
 
     public static Action<Settings> OnSettingsUpdated;
@@ -48,8 +48,6 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     public int MaxPlayers = 4;
     [Draw("Port", Tooltip = "The port that your server will listen on. You generally don't need to change this.")]
     public int Port = 7777;
-    [Draw("Use Steam Networking", Tooltip = "When enabled, uses Steam Networking Sockets (Steam must be running). When disabled, uses direct UDP/IP via LiteNetLib — join with Manual Connect (IP:port).")]
-    public bool UseSteamNetworking = true;
     [Draw("Details", Tooltip = "Details shown in the server browser.")]
     public string Details = "";
 
@@ -235,8 +233,9 @@ public class Settings : UnityModManager.ModSettings, IDrawable
                 break;
 
             case 3:
-                // Preserve existing behaviour for upgraded installs
-                data.UseSteamNetworking = true;
+                break;
+
+            case 4:
                 break;
 
             default:
