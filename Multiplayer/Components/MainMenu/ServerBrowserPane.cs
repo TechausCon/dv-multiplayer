@@ -1142,6 +1142,8 @@ public class ServerBrowserPane : MonoBehaviour
         remoteRefreshComplete = true;
     }
 
+    #endregion
+
     #region steam lobby (legacy, unused for IP-only multiplayer)
     private async void ListActiveLobbies()
     {
