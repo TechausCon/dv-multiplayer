@@ -82,10 +82,13 @@
         <!-- Copy to build folder -->
         <Copy SourceFiles="$(TargetPath);" DestinationFolder="../build/" />
 
-        <!-- Generate documentation using https://charlesdevandiere.github.io/xmldoc2md/ -->
-        <Exec Command="xmldoc2md &quot;$(TargetPath)&quot; -o &quot;../docs&quot; --gitlab-wiki --structure tree" ContinueOnError="true" />
-
-        <!-- Convert to GitHub Wiki format with flattened output -->
-        <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;../Convert-ToGitHubWiki.ps1&quot; -Flatten" WorkingDirectory="../docs" ContinueOnError="true" />
+        <!-- API docs (optional; requires xmldoc2md + ../docs). Skipped for Debug builds. -->
+        <Exec Condition="'$(ConfigurationName)' == 'Release' OR '$(GenerateApiDocs)' == 'true'"
+              Command="xmldoc2md &quot;$(TargetPath)&quot; -o &quot;../docs&quot; --gitlab-wiki --structure tree"
+              ContinueOnError="true" />
+        <Exec Condition="('$(ConfigurationName)' == 'Release' OR '$(GenerateApiDocs)' == 'true') AND Exists('../docs')"
+              Command="powershell -ExecutionPolicy Bypass -File &quot;../Convert-ToGitHubWiki.ps1&quot; -Flatten"
+              WorkingDirectory="../docs"
+              ContinueOnError="true" />
     </Target>
 </Project>
